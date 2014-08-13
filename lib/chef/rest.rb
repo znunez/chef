@@ -27,6 +27,7 @@ class Chef
   class REST < HTTP; end
 end
 
+require 'chef/http/basic_client'
 require 'chef/http/authenticator'
 require 'chef/http/decompressor'
 require 'chef/http/json_input'
@@ -190,7 +191,7 @@ class Chef
 
     def http_client(base_url=nil)
       base_url ||= url
-      BasicClient.new(base_url, :ssl_policy => Chef::HTTP::APISSLPolicy)
+      BasicClient.new(base_url, :ssl_policy => Chef::HTTP::APISSLPolicy, :http_client_cache => http_client_cache)
     end
 
     ############################################################################

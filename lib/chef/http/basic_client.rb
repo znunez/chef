@@ -21,9 +21,9 @@
 # limitations under the License.
 #
 require 'uri'
-require 'net/http'
 require 'chef/http/ssl_policies'
 require 'chef/http/http_request'
+require 'chef/http/client_cache'
 
 class Chef
   class HTTP
@@ -34,6 +34,7 @@ class Chef
       attr_reader :url
       attr_reader :http_client
       attr_reader :ssl_policy
+      attr_reader :http_client_cache
 
       # Instantiate a BasicClient.
       # === Arguments:
@@ -43,18 +44,11 @@ class Chef
       def initialize(url, opts={})
         @url = url
         @ssl_policy = opts[:ssl_policy] || DefaultSSLPolicy
-        @http_client = build_http_client
-      end
-
-      def host
-        @url.hostname
-      end
-
-      def port
-        @url.port
+        @client_cache_instance = opts[:http_client_cache]
       end
 
       def request(method, url, req_body, base_headers={})
+        configure_http_client!
         http_request = HTTPRequest.new(method, url, req_body, base_headers).http_request
         Chef::Log.debug("Initiating #{method} to #{url}")
         Chef::Log.debug("---- HTTP Request Header Data: ----")
@@ -62,7 +56,7 @@ class Chef
           Chef::Log.debug("#{name}: #{value}")
         end
         Chef::Log.debug("---- End HTTP Request Header Data ----")
-        http_client.request(http_request) do |response|
+        http_client_cache.request(url, http_request) do |response|
           Chef::Log.debug("---- HTTP Status and Header Data: ----")
           Chef::Log.debug("HTTP #{response.http_version} #{response.code} #{response.msg}")
 
@@ -95,54 +89,67 @@ class Chef
         raise
       end
 
-      #adapted from buildr/lib/buildr/core/transports.rb
-      def proxy_uri
-        proxy = Chef::Config["#{url.scheme}_proxy"]
-        # Check if the proxy string contains a scheme. If not, add the url's scheme to the
-        # proxy before parsing. The regex /^.*:\/\// matches, for example, http://.
-        proxy = if proxy.match(/^.*:\/\//)
-          URI.parse(proxy)
+      private
+
+      def configure_http_client!
+#        proxy_uri = compute_proxy_uri
+#        if proxy_uri
+#          proxy = URI proxy_uri
+#          Chef::Log.debug("Using #{proxy.host}:#{proxy.port} for proxy")
+#          proxy.user = config["#{url.scheme}_proxy_user"]
+#          proxy.pass = config["#{url.scheme}_proxy_pass"]
+#          # XXX: read from global config, should not be mutated per-request
+#          http_client_cache.proxy = proxy
+#        end
+#        if scheme == HTTPS
+#          ssl_policy.apply_to(http_client_cache)
+#        end
+      end
+
+      def host
+        url.hostname
+      end
+
+      def port
+        url.port
+      end
+
+      def scheme
+        url.scheme
+      end
+
+#      #adapted from buildr/lib/buildr/core/transports.rb
+#      # FIXME: use net-http-persistent's #no_proxy setting and move this to per-object initialization
+#      #        possibly with a wrapper class
+#      def compute_proxy_uri
+#        proxy = config["#{scheme}_proxy"]
+#        # Check if the proxy string contains a scheme. If not, add the url's scheme to the
+#        # proxy before parsing. The regex /^.*:\/\// matches, for example, http://.
+#        proxy = if proxy.match(/^.*:\/\//)
+#          URI.parse(proxy)
+#        else
+#          URI.parse("#{scheme}://#{proxy}")
+#        end if String === proxy
+#        excludes = config[:no_proxy].to_s.split(/\s*,\s*/).compact
+#        excludes = excludes.map { |exclude| exclude =~ /:\d+$/ ? exclude : "#{exclude}:*" }
+#        return proxy unless excludes.any? { |exclude| File.fnmatch(exclude, "#{host}:#{port}") }
+#      end
+
+#      def config
+#        Chef::Config
+#      end
+
+      def http_client_cache
+        if scheme == HTTPS
+          client_cache_instance.for_ssl_policy(ssl_policy)
         else
-          URI.parse("#{url.scheme}://#{proxy}")
-        end if String === proxy
-        excludes = Chef::Config[:no_proxy].to_s.split(/\s*,\s*/).compact
-        excludes = excludes.map { |exclude| exclude =~ /:\d+$/ ? exclude : "#{exclude}:*" }
-        return proxy unless excludes.any? { |exclude| File.fnmatch(exclude, "#{host}:#{port}") }
-      end
-
-      def build_http_client
-        http_client = http_client_builder.new(host, port)
-
-        if url.scheme == HTTPS
-          configure_ssl(http_client)
-        end
-
-        http_client.read_timeout = config[:rest_timeout]
-        http_client.open_timeout = config[:rest_timeout]
-        http_client
-      end
-
-      def config
-        Chef::Config
-      end
-
-      def http_client_builder
-        http_proxy = proxy_uri
-        if http_proxy.nil?
-          Net::HTTP
-        else
-          Chef::Log.debug("Using #{http_proxy.host}:#{http_proxy.port} for proxy")
-          user = Chef::Config["#{url.scheme}_proxy_user"]
-          pass = Chef::Config["#{url.scheme}_proxy_pass"]
-          Net::HTTP.Proxy(http_proxy.host, http_proxy.port, user, pass)
+          client_cache_instance.for_ssl_policy(nil)
         end
       end
 
-      def configure_ssl(http_client)
-        http_client.use_ssl = true
-        ssl_policy.apply_to(http_client)
+      def client_cache_instance
+        @client_cache_instance ||= Chef::HTTP::ClientCache.instance
       end
-
     end
   end
 end

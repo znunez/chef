@@ -61,7 +61,6 @@ class Chef
 
     end
 
-
     def self.middlewares
       @middlewares ||= []
     end
@@ -76,6 +75,8 @@ class Chef
 
     attr_reader :middlewares
 
+    attr_reader :http_client_cache
+
     # Create a HTTP client object. The supplied +url+ is used as the base for
     # all subsequent requests. For example, when initialized with a base url
     # http://localhost:4000, a call to +get+ with 'nodes' will make an
@@ -83,6 +84,7 @@ class Chef
     def initialize(url, options={})
       @url = url
       @default_headers = options[:headers] || {}
+      @http_client_cache = options[:http_client_cache]
       @sign_on_redirect = true
       @redirects_followed = 0
       @redirect_limit = 10
@@ -196,7 +198,7 @@ class Chef
 
     def http_client(base_url=nil)
       base_url ||= url
-      BasicClient.new(base_url)
+      BasicClient.new(base_url, :http_client_cache => http_client_cache)
     end
 
     protected
@@ -280,7 +282,6 @@ class Chef
         end
       end
     end
-
 
     # Wraps an HTTP request with retry logic.
     # === Arguments
@@ -385,7 +386,6 @@ class Chef
       tf.close!
       raise
     end
-
 
     public
 

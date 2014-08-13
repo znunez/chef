@@ -150,7 +150,6 @@ class Chef
         @headers
       end
 
-
       def configure_http_request(request_body=nil)
         req_path = "#{path}"
         req_path << "?#{query}" if query
