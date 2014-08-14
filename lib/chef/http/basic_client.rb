@@ -41,14 +41,15 @@ class Chef
       # url:: An URI for the remote server.
       # === Options:
       # ssl_policy:: The SSL Policy to use, defaults to DefaultSSLPolicy
-      def initialize(url, opts={})
+      def initialize(url, opts = {})
+        opts ||= {}
         @url = url
         @ssl_policy = opts[:ssl_policy] || DefaultSSLPolicy
+        @config = opts[:config] if opts[:config]
         @client_cache_instance = opts[:http_client_cache]
       end
 
       def request(method, url, req_body, base_headers={})
-        configure_http_client!
         http_request = HTTPRequest.new(method, url, req_body, base_headers).http_request
         Chef::Log.debug("Initiating #{method} to #{url}")
         Chef::Log.debug("---- HTTP Request Header Data: ----")
@@ -101,9 +102,6 @@ class Chef
 #          # XXX: read from global config, should not be mutated per-request
 #          http_client_cache.proxy = proxy
 #        end
-#        if scheme == HTTPS
-#          ssl_policy.apply_to(http_client_cache)
-#        end
       end
 
       def host
@@ -135,15 +133,15 @@ class Chef
 #        return proxy unless excludes.any? { |exclude| File.fnmatch(exclude, "#{host}:#{port}") }
 #      end
 
-#      def config
-#        Chef::Config
-#      end
+      def config
+        @config ||= Chef::Config
+      end
 
       def http_client_cache
         if scheme == HTTPS
-          client_cache_instance.for_ssl_policy(ssl_policy)
+          client_cache_instance.for_ssl_policy(ssl_policy, config: config)
         else
-          client_cache_instance.for_ssl_policy(nil)
+          client_cache_instance.for_ssl_policy(nil, config: config)
         end
       end
 

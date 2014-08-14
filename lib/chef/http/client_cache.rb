@@ -33,18 +33,15 @@ class Chef
         @caches = {}
       end
 
-#      def_delegator :@net_http_persistent, :verify_mode=
-#      def_delegator :@net_http_persistent, :cert_store
-#      def_delegator :@net_http_persistent, :cert_store=
-#      def_delegator :@net_http_persistent, :read_timeout=
-#      def_delegator :@net_http_persistent, :open_timeout=
-#      def_delegator :@net_http_persistent, :request
-
-      def for_ssl_policy(ssl_policy)
+      # Changing the SSL policy on a Net::HTTP::Persistent object invalidates all of the
+      # connections, so we create a cache of them based on SSL policy
+      def for_ssl_policy(ssl_policy, opts = {})
+        opts ||= {}
+        config = opts[:config] if opts[:config]
         caches[ssl_policy.hash] ||=
           begin
             cache = new_cache
-            ssl_policy.apply_to(cache) if ssl_policy
+            ssl_policy.apply_to(cache, config: config) if ssl_policy
             cache
           end
       end
@@ -59,6 +56,8 @@ class Chef
         cache = Net::HTTP::Persistent.new
         cache.read_timeout = config[:rest_timeout]
         cache.open_timeout = config[:rest_timeout]
+        cache.max_requests = nil
+        cache.idle_timeout = 300
         cache
       end
     end
