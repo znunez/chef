@@ -16,6 +16,7 @@
 # limitations under the License.
 #
 
+require 'chef/client'
 require 'net/http/persistent'
 require 'singleton'
 require 'forwardable'
@@ -27,17 +28,21 @@ class Chef
       extend Forwardable
 
       attr_accessor :config
+      attr_accessor :logger
       attr_accessor :caches
 
       Chef::Client.when_run_starts do |run_status|
+        logger.debug "Resetting persistent HTTP connections at start of client run"
         instance.reset!
       end
 
       Chef::Client.when_run_completes_successfully do |run_status|
+        logger.debug "Tearing down persistent HTTP connections in successful run callback"
         instance.shutdown
       end
 
       Chef::Client.when_run_fails do |run_status|
+        logger.debug "Tearing down persistent HTTP connections in failed run callback"
         instance.shutdown
       end
 
@@ -50,8 +55,10 @@ class Chef
       def for_ssl_policy(ssl_policy, opts = {})
         opts ||= {}
         config = opts[:config] if opts[:config]
+        logger = opts[:logger] if opts[:logger]
         caches[ssl_policy.hash] ||=
           begin
+            logger.debug "Creating new Net::HTTP::Persistent object for #{ssl_policy}"
             cache = new_cache
             ssl_policy.apply_to(cache, config: config) if ssl_policy
             cache
@@ -60,6 +67,10 @@ class Chef
 
       def config
         @config ||= Chef::Config
+      end
+
+      def logger
+        @logger ||= Chef::Log
       end
 
       def shutdown
