@@ -29,8 +29,20 @@ class Chef
       attr_accessor :config
       attr_accessor :caches
 
+      Chef::Client.when_run_starts do |run_status|
+        instance.reset!
+      end
+
+      Chef::Client.when_run_completes_successfully do |run_status|
+        instance.shutdown
+      end
+
+      Chef::Client.when_run_fails do |run_status|
+        instance.shutdown
+      end
+
       def initialize
-        @caches = {}
+        reset!
       end
 
       # Changing the SSL policy on a Net::HTTP::Persistent object invalidates all of the
@@ -48,6 +60,17 @@ class Chef
 
       def config
         @config ||= Chef::Config
+      end
+
+      def shutdown
+        caches.each_value do |cache|
+          cache.shutdown
+        end
+        reset!
+      end
+
+      def reset!
+        @caches = {}
       end
 
       private
