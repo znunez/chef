@@ -50,6 +50,7 @@ require 'chef/run_lock'
 require 'chef/policy_builder'
 require 'chef/request_id'
 require 'chef/platform/rebooter'
+require 'chef/http/client_cache'
 require 'ohai'
 require 'rbconfig'
 
@@ -489,6 +490,7 @@ class Chef
         @run_status = nil
         run_context = nil
         runlock.release
+        Chef::HTTP::ClientCache.instance.shutdown
         GC.start
       end
       true

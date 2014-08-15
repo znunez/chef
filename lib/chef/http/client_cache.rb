@@ -16,7 +16,6 @@
 # limitations under the License.
 #
 
-require 'chef/client'
 require 'net/http/persistent'
 require 'singleton'
 require 'forwardable'
@@ -31,21 +30,6 @@ class Chef
       attr_accessor :logger
       attr_accessor :caches
 
-      Chef::Client.when_run_starts do |run_status|
-        logger.debug "Resetting persistent HTTP connections at start of client run"
-        instance.reset!
-      end
-
-      Chef::Client.when_run_completes_successfully do |run_status|
-        logger.debug "Tearing down persistent HTTP connections in successful run callback"
-        instance.shutdown
-      end
-
-      Chef::Client.when_run_fails do |run_status|
-        logger.debug "Tearing down persistent HTTP connections in failed run callback"
-        instance.shutdown
-      end
-
       def initialize
         reset!
       end
@@ -53,9 +37,7 @@ class Chef
       # Changing the SSL policy on a Net::HTTP::Persistent object invalidates all of the
       # connections, so we create a cache of them based on SSL policy
       def for_ssl_policy(ssl_policy, opts = {})
-        opts ||= {}
-        config = opts[:config] if opts[:config]
-        logger = opts[:logger] if opts[:logger]
+        set_opts(opts)
         caches[ssl_policy.hash] ||=
           begin
             logger.debug "Creating new Net::HTTP::Persistent object for #{ssl_policy}"
@@ -65,15 +47,22 @@ class Chef
           end
       end
 
+      def set_opts(opts)
+        opts ||= {}
+        @config = opts[:config] if opts[:config]
+        @logger = opts[:logger] if opts[:logger]
+      end
+
       def config
         @config ||= Chef::Config
       end
 
       def logger
-        @logger ||= Chef::Log
+        @logger ||= Chef::Log.logger
       end
 
       def shutdown
+        logger.debug "Shutting down Net::HTTP::Persistent caches"
         caches.each_value do |cache|
           cache.shutdown
         end
@@ -81,6 +70,7 @@ class Chef
       end
 
       def reset!
+        logger.debug "Releasing Net::HTTP::Persistent cache objects"
         @caches = {}
       end
 
