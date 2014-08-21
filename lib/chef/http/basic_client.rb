@@ -35,6 +35,7 @@ class Chef
       attr_reader :http_client
       attr_reader :ssl_policy
       attr_reader :http_client_cache
+      attr_reader :use_keepalives
 
       # Instantiate a BasicClient.
       # === Arguments:
@@ -47,17 +48,20 @@ class Chef
         @ssl_policy = opts[:ssl_policy] || DefaultSSLPolicy
         @config = opts[:config] if opts[:config]
         @client_cache_instance = opts[:http_client_cache]
+        @use_keepalives = opts[:use_keepalives] || false
       end
 
       def request(method, url, req_body, base_headers={})
+        tries ||= 2
         http_request = HTTPRequest.new(method, url, req_body, base_headers).http_request
+        http_request['connection'] = 'close' unless use_keepalives
         Chef::Log.debug("Initiating #{method} to #{url}")
         Chef::Log.debug("---- HTTP Request Header Data: ----")
         base_headers.each do |name, value|
           Chef::Log.debug("#{name}: #{value}")
         end
         Chef::Log.debug("---- End HTTP Request Header Data ----")
-        http_client_cache.request(url, http_request) do |response|
+        http_client.request(url, http_request) do |response|
           Chef::Log.debug("---- HTTP Status and Header Data: ----")
           Chef::Log.debug("HTTP #{response.http_version} #{response.code} #{response.msg}")
 
@@ -87,6 +91,12 @@ class Chef
         end
       rescue OpenSSL::SSL::SSLError => e
         Chef::Log.error("SSL Validation failure connecting to host: #{host} - #{e.message}")
+        raise
+      rescue Net::HTTP::Persistent::Error => e
+        # only retry "too many connection reset" errors
+        raise unless e.message =~ /too many connection resets/
+        Chef::Log.debug("Retrying too many connection reset error")
+        retry unless (tries -= 1).zero?
         raise
       end
 
@@ -137,7 +147,7 @@ class Chef
         @config ||= Chef::Config
       end
 
-      def http_client_cache
+      def http_client
         if scheme == HTTPS
           client_cache_instance.for_ssl_policy(ssl_policy, config: config)
         else

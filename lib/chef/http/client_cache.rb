@@ -29,6 +29,10 @@ class Chef
       attr_accessor :config
       attr_accessor :logger
       attr_accessor :caches
+      attr_accessor :read_timeout
+      attr_accessor :open_timeout
+      attr_accessor :max_requests
+      attr_accessor :idle_timeout
 
       def initialize
         reset!
@@ -53,6 +57,11 @@ class Chef
         @logger = opts[:logger] if opts[:logger]
       end
 
+      def config=(hash)
+        reset_vars!
+        @config = hash
+      end
+
       def config
         @config ||= Chef::Config
       end
@@ -69,19 +78,42 @@ class Chef
         reset!
       end
 
+      def reset_vars!
+        @read_timeout = nil
+        @open_timeout = nil
+        @max_requests = nil
+        @idle_timeout = nil
+      end
+
       def reset!
         logger.debug "Releasing Net::HTTP::Persistent cache objects"
         @caches = {}
+      end
+
+      def read_timeout
+        @read_timeout ||= config[:rest_timeout]
+      end
+
+      def open_timeout
+        @open_timeout ||= config[:rest_timeout]
+      end
+
+      def max_requests
+        @max_requests ||= config[:max_requests]
+      end
+
+      def idle_timeout
+        @idle_timeout ||= config[:idle_timeout]
       end
 
       private
 
       def new_cache
         cache = Net::HTTP::Persistent.new
-        cache.read_timeout = config[:rest_timeout]
-        cache.open_timeout = config[:rest_timeout]
-        cache.max_requests = nil
-        cache.idle_timeout = 300
+        cache.read_timeout = read_timeout
+        cache.open_timeout = open_timeout
+        cache.max_requests = max_requests
+        cache.idle_timeout = idle_timeout
         cache
       end
     end

@@ -27,7 +27,6 @@ end
 # Ruby 1.9 Compat
 $:.unshift File.expand_path("../..", __FILE__)
 
-
 require 'rubygems'
 require 'rspec/mocks'
 
@@ -169,6 +168,10 @@ RSpec.configure do |config|
 
   config.before(:each) do
     Chef::Config.reset
+    Chef::HTTP::ClientCache.instance.shutdown
+    Chef::HTTP::ClientCache.instance.open_timeout = 0.1
+    Chef::HTTP::ClientCache.instance.read_timeout = 0.1
+    Chef::HTTP::ClientCache.instance.max_requests = 1
 
     # By default, treat deprecation warnings as errors in tests.
     Chef::Config.treat_deprecation_warnings_as_errors(true)
