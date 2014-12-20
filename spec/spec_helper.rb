@@ -18,6 +18,10 @@
 # If you need to add anything in here, don't.
 # Add it to one of the files in spec/support
 
+# Test setting the LOGONSERVER environment variable
+# to see if it works around Net* api usage in msys
+ENV['LOGONSERVER'] = ENV['COMPUTERNAME']
+
 # Abuse ruby's constant lookup to avoid undefined constant errors
 module Shell
   JUST_TESTING_MOVE_ALONG = true unless defined? JUST_TESTING_MOVE_ALONG
