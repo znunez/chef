@@ -3,7 +3,7 @@ gemspec :name => "chef"
 
 gem "activesupport", "< 4.0.0", :group => :compat_testing, :platform => "ruby"
 
-gem "ffi-yajl", github: "chef/ffi-yajl"
+gem "ffi-yajl", github: "chef/ffi-yajl", branch: "lcg/dlopen-extension"
 
 group(:docgen) do
   gem "yard"
