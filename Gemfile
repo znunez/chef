@@ -3,6 +3,8 @@ gemspec :name => "chef"
 
 gem "activesupport", "< 4.0.0", :group => :compat_testing, :platform => "ruby"
 
+gem 'chef-config', git: "git@github.com:chef/chef-config.git"
+
 group(:docgen) do
   gem "yard"
 end
