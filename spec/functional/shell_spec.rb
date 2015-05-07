@@ -39,9 +39,8 @@ describe Shell do
           sleep 0.01
         end
         if Time.new - start > 30
-          STDERR.puts "did not read expected value `#{expected_value}' within 15s"
-          STDERR.puts "Buffer so far: `#{buffer}'"
-          break
+          raise "did not read expected value `#{expected_value}' within 15s\n" +
+                "Buffer so far: `#{buffer}'"
         end
       end
       buffer
@@ -67,7 +66,7 @@ describe Shell do
         path_to_chef_shell = File.expand_path("../../../bin/chef-shell", __FILE__)
         output = ''
         status = popen4("#{path_to_chef_shell} -c #{config} #{options}", :waitlast => true) do |pid, stdin, stdout, stderr|
-          read_until(stdout, "chef >")
+          read_until(stdout, "chef (#{Chef::VERSION})>")
           yield stdout, stdin if block_given?
           stdin.write("'done'\n")
           output = read_until(stdout, '=> "done"')
@@ -84,13 +83,11 @@ describe Shell do
           config = File.expand_path("shef-config.rb", CHEF_SPEC_DATA)
           path_to_chef_shell = File.expand_path("../../../bin/chef-shell", __FILE__)
           reader, writer, pid = PTY.spawn("#{path_to_chef_shell} -c #{config} #{options}")
-          read_until(reader, "chef >")
+          read_until(reader, "chef (#{Chef::VERSION})>")
           yield reader, writer if block_given?
           writer.puts('"done"')
           output = read_until(reader, '=> "done"')
           writer.print("exit\n")
-          read_until(reader, "exit")
-          read_until(reader, "\n")
           read_until(reader, "\n")
           writer.close
 
